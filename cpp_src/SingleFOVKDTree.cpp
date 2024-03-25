@@ -186,7 +186,6 @@ py::list SpatialDataSingle::buildFPTreeKNN(const py::object &cellPos,
     }
 
     return result;
-    // return result;
 }
 
 std::set<DuplicatePattern> SpatialDataSingle::buildFPTreeKNN(const Positions &cellPos,
@@ -462,7 +461,7 @@ py::list SpatialDataSingle::motifEnrichmentKNN(
 {
     Idxs idxs(this->coordinates.shape(0));
     std::vector<std::vector<float>> dists(this->coordinates.shape(0));
-    // Use k+1 to find the knn except for the points themselves
+    // Use k+1 to find the kNNs of all cells except for the points themselves
     auto coords = this->coordinates.template unchecked<2>();
     for (ssize_t i = 0; i < this->coordinates.shape(0); i++)
     {
@@ -610,13 +609,13 @@ py::list SpatialDataSingle::motifEnrichmentDist(
 
     for (const auto &motif : motifsToUse)
     {
-        std::vector<Item> motif_vec;
+        std::vector<Item> motifVec;
         for (const auto &item : motif)
         {
-            motif_vec.push_back(item.cast<Item>());
+            motifVec.push_back(item.cast<Item>());
         }
 
-        auto sortMotif = motif_vec;
+        auto sortMotif = motifVec;
         std::sort(sortMotif.begin(), sortMotif.end());
 
         auto result = motifCalculation(sortMotif, idxs, dists, this->labels, cellTypeIndxs, 100000000);
@@ -641,49 +640,49 @@ py::list SpatialDataSingle::motifEnrichmentDist(
     return motifsOut;
 }
 
-PYBIND11_MODULE(spatial_module, m)
-{
-    py::class_<SpatialDataSingle>(m, "SpatialDataSingle")
-        .def(py::init<>())
-        .def("set_data", &SpatialDataSingle::setData, "Set the spatial coordinates and labels")
-        .def("get_coordinates", &SpatialDataSingle::getCoordinates, "Get the spatial coordinates")
-        // .def("add_point", &SpatialDataSingle::addPoint, "Add a single point")
-        // .def("add_points", &SpatialDataSingle::addPoints, "Add multiple points")
-        .def("build_kdtree", &SpatialDataSingle::buildKDTree, "Build the KD-tree")
-        .def("radius_search", &SpatialDataSingle::radiusSearch,
-             py::arg("cell_pos"),
-             py::arg("radius") = 100.0,
-             "Get radius search indices by kdtree")
-        .def("build_fptree_knn", py::overload_cast<const py::object &, int, float, bool, bool, float>(&SpatialDataSingle::buildFPTreeKNN),
-             py::arg("cell_pos"),
-             py::arg("k") = 30,
-             py::arg("min_support") = 0.5,
-             py::arg("dis_duplicates") = false,
-             py::arg("if_max") = true,
-             py::arg("max_dist") = 500.0,
-             "Build FP-tree using KNN")
-        .def("build_fptree_dist", py::overload_cast<const py::object &, float, float, bool, bool, int>(&SpatialDataSingle::buildFPTreeDist),
-             py::arg("cell_pos"),
-             py::arg("radius") = 100.0,
-             py::arg("min_support") = 0.5,
-             py::arg("dis_duplicates") = false,
-             py::arg("if_max") = true,
-             py::arg("min_size") = 0,
-             "Build FP-tree using distance")
-        .def("motif_enrichment_knn", &SpatialDataSingle::motifEnrichmentKNN,
-             py::arg("ct"),
-             py::arg("motifs"),
-             py::arg("k") = 30,
-             py::arg("min_support") = 0.5,
-             py::arg("dis_duplicates") = false,
-             py::arg("max_dist") = 200.0,
-             "Perform motif enrichment using KNN")
-        .def("motif_enrichment_dist", &SpatialDataSingle::motifEnrichmentDist,
-             py::arg("ct"),
-             py::arg("motifs"),
-             py::arg("radius") = 100.0,
-             py::arg("min_support") = 0.5,
-             py::arg("dis_duplicates") = false,
-             py::arg("min_size") = 0,
-             "Perform motif enrichment using distance");
-}
+// PYBIND11_MODULE(spatial_module, m)
+// {
+//     py::class_<SpatialDataSingle>(m, "SpatialDataSingle")
+//         .def(py::init<>())
+//         .def("set_data", &SpatialDataSingle::setData, "Set the spatial coordinates and labels")
+//         .def("get_coordinates", &SpatialDataSingle::getCoordinates, "Get the spatial coordinates")
+//         // .def("add_point", &SpatialDataSingle::addPoint, "Add a single point")
+//         // .def("add_points", &SpatialDataSingle::addPoints, "Add multiple points")
+//         .def("build_kdtree", &SpatialDataSingle::buildKDTree, "Build the KD-tree")
+//         .def("radius_search", &SpatialDataSingle::radiusSearch,
+//              py::arg("cell_pos"),
+//              py::arg("radius") = 100.0,
+//              "Get radius search indices by kdtree")
+//         .def("build_fptree_knn", py::overload_cast<const py::object &, int, float, bool, bool, float>(&SpatialDataSingle::buildFPTreeKNN),
+//              py::arg("cell_pos"),
+//              py::arg("k") = 30,
+//              py::arg("min_support") = 0.5,
+//              py::arg("dis_duplicates") = false,
+//              py::arg("if_max") = true,
+//              py::arg("max_dist") = 500.0,
+//              "Build FP-tree using KNN")
+//         .def("build_fptree_dist", py::overload_cast<const py::object &, float, float, bool, bool, int>(&SpatialDataSingle::buildFPTreeDist),
+//              py::arg("cell_pos"),
+//              py::arg("radius") = 100.0,
+//              py::arg("min_support") = 0.5,
+//              py::arg("dis_duplicates") = false,
+//              py::arg("if_max") = true,
+//              py::arg("min_size") = 0,
+//              "Build FP-tree using distance")
+//         .def("motif_enrichment_knn", &SpatialDataSingle::motifEnrichmentKNN,
+//              py::arg("ct"),
+//              py::arg("motifs"),
+//              py::arg("k") = 30,
+//              py::arg("min_support") = 0.5,
+//              py::arg("dis_duplicates") = false,
+//              py::arg("max_dist") = 200.0,
+//              "Perform motif enrichment using KNN")
+//         .def("motif_enrichment_dist", &SpatialDataSingle::motifEnrichmentDist,
+//              py::arg("ct"),
+//              py::arg("motifs"),
+//              py::arg("radius") = 100.0,
+//              py::arg("min_support") = 0.5,
+//              py::arg("dis_duplicates") = false,
+//              py::arg("min_size") = 0,
+//              "Perform motif enrichment using distance");
+// }
