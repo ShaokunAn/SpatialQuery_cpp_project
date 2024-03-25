@@ -8,6 +8,7 @@ cpp_extension = Extension(
         "cpp_src/SingleFOVKDTree.cpp",
         "cpp_src/utils.cpp",
         "cpp_src/FPGrowth.cpp",
+        "cpp_src/MultipleFOVKDTree.cpp",
     ],
     include_dirs=["cpp_src", "/opt/homebrew/Cellar/pcl/1.14.0_1/include/pcl-1.14",
                   "/opt/homebrew/Cellar/boost/1.84.0_1/include",
