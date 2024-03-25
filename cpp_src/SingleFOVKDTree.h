@@ -37,7 +37,7 @@ public:
 
     std::set<DuplicatePattern> buildFPTreeKNN(const Positions &cell_pos,
                                               int k = 30,
-                                              float minSupport = 30,
+                                              float minSupport = 0.5,
                                               bool disDuplicates = false,
                                               bool ifMax = true,
                                               float maxDist = 200.0);
