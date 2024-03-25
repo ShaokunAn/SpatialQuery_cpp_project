@@ -9,7 +9,7 @@ void SpatialDataMultiple::setFOVData(int fovID, const py::array_t<float> &coordi
     fovData.buildKDTree();
 }
 
-py::tuple SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::list &fovIDs, int k, float minSupport, bool disDuplicates)
+py::list SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::list &fovIDs, int k, float minSupport, bool disDuplicates)
 {
     std::vector<Transaction> transactions;
 
@@ -26,6 +26,10 @@ py::tuple SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::li
         {
             if (labels[i] == cellType)
                 cinds.push_back(i);
+        }
+        if (cinds.size() == 0)
+        {
+            continue;
         }
 
         transactions.reserve(transactions.size() + cinds.size());
@@ -104,7 +108,7 @@ py::tuple SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::li
     return result;
 }
 
-py::tuple SpatialDataMultiple::buildFPTreeDist(const Item &cellType, const py::list &fovIDs, float radius, float minSupport, bool disDuplicates, int minSize)
+py::list SpatialDataMultiple::buildFPTreeDist(const Item &cellType, const py::list &fovIDs, float radius, float minSupport, bool disDuplicates, int minSize)
 {
     std::vector<Transaction> transactions;
 
@@ -122,6 +126,10 @@ py::tuple SpatialDataMultiple::buildFPTreeDist(const Item &cellType, const py::l
             {
                 cinds.push_back(i);
             }
+        }
+        if (cinds.size() == 0)
+        {
+            continue;
         }
 
         transactions.reserve(transactions.size() + cinds.size());
@@ -278,6 +286,7 @@ py::list SpatialDataMultiple::motifEnrichmentKNN(const Item &cellType, const py:
         motifOut["n_center"] = nCt;
         motifOut["n_motif"] = nMotifLabels;
         motifOut["n_labels"] = nLabels;
+        motifOut["motifs"] = motif;
         motifsOut.append(motifOut);
     }
     return motifsOut;
@@ -358,13 +367,14 @@ py::list SpatialDataMultiple::motifEnrichmentDist(const Item &cellType, const py
         motifOut["n_center"] = nCt;
         motifOut["n_motif"] = nMotifLabels;
         motifOut["n_labels"] = nLabels;
+        motifOut["motifs"] = motif;
         motifsOut.append(motifOut);
     }
     return motifsOut;
 }
 
 py::list SpatialDataMultiple::findFPKnnFOV(const std::string &cellType, const int fovID, int k,
-                                           int minCount, float minSupport)
+                                           float minSupport)
 {
     SpatialDataSingle &singleFOV = fovs[fovID];
     const std::vector<Item> &labels = singleFOV.labels;
@@ -386,14 +396,39 @@ py::list SpatialDataMultiple::findFPKnnFOV(const std::string &cellType, const in
     return fp;
 }
 
-std::pair<py::dict, py::dict>
-SpatialDataMultiple::differentialAnalysisKnn(const std::string &cellType,
-                                             const py::list &datasets,
-                                             const py::list &fovsID1,
-                                             const py::list &fovsID2,
-                                             int k,
-                                             int minCount,
-                                             float minSupport)
+py::list SpatialDataMultiple::findFPDistFOV(const std::string &cellType, const int fovID, float maxDist,
+                                            int minSize, float minSupport)
+{
+    SpatialDataSingle &singleFOV = fovs[fovID];
+    const std::vector<Item> &labels = singleFOV.labels;
+    std::vector<size_t> cinds;
+    for (size_t i = 0; i < labels.size(); ++i)
+    {
+        if (labels[i] == cellType)
+            cinds.push_back(i);
+    }
+
+    auto r = singleFOV.coordinates.template unchecked<2>();
+    py::array_t<float> ctPosFOV;
+    auto ctPosFOVPtr = ctPosFOV.mutable_unchecked<2>();
+    for (size_t i = 0; i < cinds.size(); ++i)
+    {
+        ctPosFOVPtr(i, 0) = r(cinds[i], 0);
+        ctPosFOVPtr(i, 1) = r(cinds[i], 1);
+    }
+
+    py::tuple fpOut = singleFOV.buildFPTreeDist(ctPosFOV, maxDist, minSupport, false, false, minSize);
+    py::list fp = fpOut[0].cast<py::list>();
+
+    return fp;
+}
+
+py::tuple SpatialDataMultiple::differentialAnalysisKnn(const std::string &cellType,
+                                                       const py::list &datasets,
+                                                       const py::list &fovsID1,
+                                                       const py::list &fovsID2,
+                                                       int k,
+                                                       float minSupport)
 {
     // Identify frequent patterns in each dataset
     std::vector<std::unordered_map<std::string, std::vector<double>>> fpDatasets(2);
@@ -409,7 +444,7 @@ SpatialDataMultiple::differentialAnalysisKnn(const std::string &cellType,
         {
             int fov = py::cast<int>(fovID);
 
-            py::list fpFov = findFPKnnFOV(cellType, fov, k, minCount, minSupport);
+            py::list fpFov = findFPKnnFOV(cellType, fov, k, minSupport);
             if (fpFov.empty())
             {
                 continue;
@@ -436,30 +471,6 @@ SpatialDataMultiple::differentialAnalysisKnn(const std::string &cellType,
                 itemsets[i].insert(itemset);
             }
         }
-
-        // py::list fpDataset;
-        // fpDataset["itemsets"] = py::cast(patternSupport.keys());
-        // fpDataset["itemsets"] = patternSupport.keys();
-        // for (const auto &[itemset, fovSupportMap] : patternSupport)
-        // {
-        //     std::vector<double> supportValues;
-        //     for (const autp &fovID : fovsID)
-        //     {
-        //         int fov = py::cast<int>(fovID);
-        //         std::string fovName = std::to_string(fov);
-        //         if (fovSupportMap.find(fovName) != fovSupportMap.end())
-        //         {
-        //             supportValues.push_back(fovSupportMap.at(fovName));
-        //         }
-        //         else
-        //         {
-        //             supportValues.push_back(0.0);
-        //         }
-        //     }
-        //     fpDataset["support_" + datasetName + "_" + fovName] = py::cast(supportValues);
-        // }
-
-        // fpDatasets[datasetName] = fpDataset;
     }
     py::dict result1, result2;
     for (const auto &itemset : itemsets[0])
@@ -471,7 +482,70 @@ SpatialDataMultiple::differentialAnalysisKnn(const std::string &cellType,
         result2[py::cast(itemset)] = py::cast(fpDatasets[1]);
     }
 
-    return {result1, result2};
+    return py::make_tuple(result1, result2);
+}
+
+py::tuple SpatialDataMultiple::differentialAnalysisDist(const std::string &cellType,
+                                                        const py::list &datasets,
+                                                        const py::list &fovsID1,
+                                                        const py::list &fovsID2,
+                                                        float maxDist,
+                                                        float minSupport,
+                                                        int minSize)
+{
+    // Identify frequent patterns in each dataset
+    std::vector<std::unordered_map<std::string, std::vector<double>>> fpDatasets(2);
+    std::vector<std::unordered_set<std::string>> itemsets(2);
+
+    for (size_t i = 0; i < 2; ++i)
+    {
+        const py::list &fovsID = (i == 0) ? fovsID1 : fovsID2;
+        std::string datasetName = datasets[i].cast<std::string>();
+
+        // std::unordered_map<std::string, std::unordered_map<std::string, double>> patternSupport;
+        for (const auto &fovID : fovsID)
+        {
+            int fov = py::cast<int>(fovID);
+
+            py::list fpFov = findFPDistFOV(cellType, fov, maxDist, minSize, minSupport);
+            if (fpFov.empty())
+            {
+                continue;
+            }
+
+            for (size_t j = 0; j < fpFov.size(); ++j)
+            {
+                // Build the string representation of itemset for indexing support values
+                py::list itemlist = fpFov[j]["items"];
+                std::ostringstream oss;
+                bool first = true;
+                for (const auto &item : itemlist)
+                {
+                    if (!first)
+                    {
+                        oss << ", ";
+                    }
+                    oss << item.cast<std::string>();
+                    first = false;
+                }
+                std::string itemset = oss.str();
+                double support = fpFov[j]["support"].cast<double>();
+                fpDatasets[i][itemset].push_back(support);
+                itemsets[i].insert(itemset);
+            }
+        }
+    }
+    py::dict result1, result2;
+    for (const auto &itemset : itemsets[0])
+    {
+        result1[py::cast(itemset)] = py::cast(fpDatasets[0]);
+    }
+    for (const auto &itemset : itemsets[1])
+    {
+        result2[py::cast(itemset)] = py::cast(fpDatasets[1]);
+    }
+
+    return py::make_tuple(result1, result2);
 }
 
 PYBIND11_MODULE(spatial_module, m)
@@ -493,7 +567,7 @@ PYBIND11_MODULE(spatial_module, m)
              py::arg("min_support") = 0.5,
              py::arg("dis_duplicates") = false,
              py::arg("if_max") = true,
-             py::arg("max_dist") = 500.0,
+             py::arg("max_dist") = 200.0,
              "Build FP-tree using KNN")
         .def("build_fptree_dist", py::overload_cast<const py::object &, float, float, bool, bool, int>(&SpatialDataSingle::buildFPTreeDist),
              py::arg("cell_pos"),
@@ -560,16 +634,30 @@ PYBIND11_MODULE(spatial_module, m)
              py::arg("cell_type"),
              py::arg("fov_id"),
              py::arg("k") = 30,
-             py::arg("min_count") = 0,
              py::arg("min_support") = 0.5,
-             "Find frequent patterns in each single FOV")
+             "Find frequent patterns in each single FOV with KNN")
+        .def("find_fp_dist_fov", &SpatialDataMultiple::findFPDistFOV,
+             py::arg("cell_type"),
+             py::arg("fov_id"),
+             py::arg("radius") = 100.0,
+             py::arg("min_size") = 0,
+             py::arg("min_support") = 0.5,
+             "Find frequent patterns in each single FOV with radius-based neighborhood")
         .def("differential_analysis_knn", &SpatialDataMultiple::differentialAnalysisKnn,
              py::arg("cell_type"),
              py::arg("datasets"),
+             py::arg("fovs_id0"),
              py::arg("fovs_id1"),
-             py::arg("fovs_id2"),
              py::arg("k") = 30,
-             py::arg("min_count") = 0,
              py::arg("min_support") = 0.5,
-             "Perform differential analysis of frequent patterns using KNN");
+             "Perform differential analysis of frequent patterns using KNN")
+        .def("differential_analysis_dist", &SpatialDataMultiple::differentialAnalysisDist,
+             py::arg("cell_type"),
+             py::arg("datasets"),
+             py::arg("fovs_id0"),
+             py::arg("fovs_id1"),
+             py::arg("radius") = 100.0,
+             py::arg("min_support") = 0.5,
+             py::arg("min_size") = 0,
+             "Perform differential analysis of frequent patterns using radius-based neighborhood");
 }

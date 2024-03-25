@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import statsmodels.stats.multitest as mt
 from scipy.stats import hypergeom
 from spatial_module import SpatialDataSingle
 
@@ -174,9 +175,16 @@ class spatial_query:
                 n_ct = round(n_ct / motif.count(ct))
             hyge = hypergeom(M=len(self.labels), n=n_ct, N=n_motif_labels)
             p_val = hyge.sf(n_center_motif)
-            motif_out_dict['p-val'] = p_val
+            motif_out_dict['p-values'] = p_val
 
-        out_pd = pd.DataFrame(out).sort_values(by='p-val', ignore_index=True)
+        out_pd = pd.DataFrame(out)
+        p_values = out_pd['p-values'].tolist()
+        if_rejected, corrected_p_values = mt.fdrcorrection(p_values,
+                                                           alpha=0.05,
+                                                           method='poscorr')
+        out_pd['corrected p-values'] = corrected_p_values
+        out_pd['if_significant'] = if_rejected
+        out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
         return out_pd
 
     def motif_enrichment_dist(self,
@@ -231,9 +239,16 @@ class spatial_query:
                 n_ct = round(n_ct / motif.count(ct))
             hyge = hypergeom(M=len(self.labels), n=n_ct, N=n_motif_labels)
             p_val = hyge.sf(n_center_motif)
-            motif_out_dict['p-val'] = p_val
+            motif_out_dict['p-values'] = p_val
 
-        out_pd = pd.DataFrame(out).sort_values(by='p-val', ignore_index=True)
+        out_pd = pd.DataFrame(out)
+        p_values = out_pd['p-values'].tolist()
+        if_rejected, corrected_p_values = mt.fdrcorrection(p_values,
+                                                           alpha=0.05,
+                                                           method='poscorr')
+        out_pd['corrected p-values'] = corrected_p_values
+        out_pd['if_significant'] = if_rejected
+        out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
         return out_pd
 
     def find_patterns_grid(self,
@@ -335,7 +350,7 @@ class spatial_query:
                                                     dis_duplicates=dis_duplicates,
                                                     max_dist=max_dist, min_size=min_size,
                                                     min_support=min_support,
-                                                )
+                                                    )
         id_neighbor_motifs = []
         if if_display or return_cellID:
             for motif in fp['itemsets']:
