@@ -190,7 +190,7 @@ std::pair<int, int> motifCalculation(
     const std::vector<Item> &motif,
     const Idxs &idxs,
     const std::vector<std::vector<float>> &dists,
-    std::vector<std::string> &labels,
+    const std::vector<std::string> &labels,
     const std::vector<int> &cinds,
     float maxDist)
 {

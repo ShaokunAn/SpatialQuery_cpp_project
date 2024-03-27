@@ -2,7 +2,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <cmath>
-#include <chrono>
+// #include <chrono>
 
 #include "SingleFOVKDTree.h"
 #include "FPGrowth.h"
@@ -100,7 +100,7 @@ py::list SpatialDataSingle::buildFPTreeKNN(const py::object &cellPos,
     float maxDistSquare = maxDist * maxDist;
 
     // For each point in cellPos, perform k-NN search and filter results
-    auto start = std::chrono::high_resolution_clock::now();
+    // auto start = std::chrono::high_resolution_clock::now();
     for (ssize_t i = 0; i < r.shape(0); i++)
     {
         // Perform k-NN search with PCL
@@ -130,36 +130,36 @@ py::list SpatialDataSingle::buildFPTreeKNN(const py::object &cellPos,
             transactions.push_back(transaction);
         }
     }
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time to build transactions: " << duration.count() << " microseconds" << std::endl;
+    // auto end = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    // std::cout << "Running time to build transactions: " << duration.count() << " microseconds" << std::endl;
 
     // Construct the FP-tree from transactions and mine it for patterns
-    start = std::chrono::high_resolution_clock::now();
+    // start = std::chrono::high_resolution_clock::now();
     FPTree fpTree(transactions, static_cast<uint64_t>(std::ceil(minSupport * transactions.size())));
     std::set<Pattern> frequentPatterns = fptree_growth(fpTree);
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for frequentPatterns: " << duration.count() << " microseconds" << std::endl;
-    std::cout << "number of patterns: " << frequentPatterns.size() << std::endl;
+    // end = std::chrono::high_resolution_clock::now();
+    // duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    // std::cout << "Running time for frequentPatterns: " << duration.count() << " microseconds" << std::endl;
+    // std::cout << "number of patterns: " << frequentPatterns.size() << std::endl;
 
     if (ifMax)
     {
-        start = std::chrono::high_resolution_clock::now();
+        // start = std::chrono::high_resolution_clock::now();
         frequentPatterns = findMaximalPatterns(frequentPatterns);
-        end = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for find max: " << duration.count() << " microseconds" << std::endl;
+        // end = std::chrono::high_resolution_clock::now();
+        // duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        // std::cout << "Running time for find max: " << duration.count() << " microseconds" << std::endl;
     }
     std::set<DuplicatePattern> frequentDuplicatePatterns;
 
     if (disDuplicates)
     {
-        start = std::chrono::high_resolution_clock::now();
+        // start = std::chrono::high_resolution_clock::now();
         frequentDuplicatePatterns = removeSuffix(frequentPatterns);
-        end = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for remove suffix: " << duration.count() << " microseconds" << std::endl;
+        // end = std::chrono::high_resolution_clock::now();
+        // duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        // std::cout << "Running time for remove suffix: " << duration.count() << " microseconds" << std::endl;
     }
     else
     {
@@ -280,7 +280,7 @@ py::tuple SpatialDataSingle::buildFPTreeDist(
     Idxs validIdx;
 
     // For each point in cellPos, perform radius-based search and filter results
-    auto start = std::chrono::high_resolution_clock::now();
+    // auto start = std::chrono::high_resolution_clock::now();
     for (ssize_t i = 0; i < r.shape(0); i++)
     {
         // Perform radius-based search with PCL
@@ -313,36 +313,36 @@ py::tuple SpatialDataSingle::buildFPTreeDist(
         }
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time to build transactions: " << duration.count() << " microseconds" << std::endl;
+    // auto end = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    // std::cout << "Running time to build transactions: " << duration.count() << " microseconds" << std::endl;
 
     // Construct the FP-tree from transactions and mine it for patterns
-    start = std::chrono::high_resolution_clock::now();
+    // start = std::chrono::high_resolution_clock::now();
     FPTree fpTree(transactions, static_cast<uint64_t>(minSupport * transactions.size()));
     std::set<Pattern> frequentPatterns = fptree_growth(fpTree);
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for frequentPatterns: " << duration.count() << " microseconds" << std::endl;
-    std::cout << "number of patterns: " << frequentPatterns.size() << std::endl;
+    // end = std::chrono::high_resolution_clock::now();
+    // duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    // std::cout << "Running time for frequentPatterns: " << duration.count() << " microseconds" << std::endl;
+    // std::cout << "number of patterns: " << frequentPatterns.size() << std::endl;
 
     if (ifMax)
     {
-        start = std::chrono::high_resolution_clock::now();
+        // start = std::chrono::high_resolution_clock::now();
         frequentPatterns = findMaximalPatterns(frequentPatterns);
-        end = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for find max: " << duration.count() << " microseconds" << std::endl;
+        // end = std::chrono::high_resolution_clock::now();
+        // duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        // std::cout << "Running time for find max: " << duration.count() << " microseconds" << std::endl;
     }
 
     std::set<DuplicatePattern> frequentDuplicatePatterns;
     if (disDuplicates)
     {
-        start = std::chrono::high_resolution_clock::now();
+        // start = std::chrono::high_resolution_clock::now();
         frequentDuplicatePatterns = removeSuffix(frequentPatterns);
-        end = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for remove suffix: " << duration.count() << " microseconds" << std::endl;
+        // end = std::chrono::high_resolution_clock::now();
+        // duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        // std::cout << "Running time for remove suffix: " << duration.count() << " microseconds" << std::endl;
     }
     else
     {

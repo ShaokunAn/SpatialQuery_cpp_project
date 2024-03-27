@@ -11,7 +11,7 @@ from scipy.stats import hypergeom
 from spatial_module import SpatialDataSingle
 
 
-class spatial_query:
+class spatial_query_single:
     def __init__(self,
                  adata: ad.AnnData,
                  dataset: str = 'ST',

@@ -1,13 +1,14 @@
 from typing import List, Optional, Union
 
 import pandas as pd
+import scipy.stats as stats
 import statsmodels.stats.multitest as mt
 from anndata import AnnData
 from scipy.stats import hypergeom
 from spatial_module import SpatialDataMultiple
 
 
-class spatial_query_multi:
+class spatial_query_multiple:
     def __init__(self,
                  adatas: List[AnnData],
                  datasets: List[str],
@@ -52,7 +53,7 @@ class spatial_query_multi:
             self.spatial_query_multiple.set_fov_data(
                 i,
                 adata.obsm[self.spatial_key],
-                adata.obs[self.label_key]
+                adata.obs[self.label_key].to_list()
             )  # store data in cpp object
 
     def find_fp_knn(self,
@@ -84,6 +85,9 @@ class spatial_query_multi:
             min_support=min_support,
             dis_duplicates=dis_duplicates,
         )
+        if len(fp) == 0:
+            return pd.DataFrame(columns=['items', 'support'])
+        fp = pd.DataFrame(fp).sort_values(by='support', ascending=False, ignore_index=True)
         return fp
 
     def find_fp_dist(self,
@@ -114,6 +118,10 @@ class spatial_query_multi:
             dis_duplicates=dis_duplicates,
             min_size=min_size
         )
+        if len(fp) == 0:
+            return pd.DataFrame(columns=['items', 'support'])
+
+        fp = pd.DataFrame(fp).sort_values(by='support', ascending=False, ignore_index=True)
         return fp
 
     def motif_enrichment_knn(self,
@@ -275,6 +283,86 @@ class spatial_query_multi:
         out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
         return out_pd
 
+    def differential_analysis_knn(self,
+                                  ct: str,
+                                  datasets: Optional[Union[str, List[str]]],
+                                  k: int = 30,
+                                  min_support: float = 0.5,
+                                  ):
+        # Use same codes but use replace the frequent patterns search with cpp methods
+        datasets = self.check_dataset(datasets)
+        if len(datasets) != 2:
+            raise ValueError("Require 2 valid datasets for differential analysis.")
+
+        valid_ds_names = [d.split('_')[0] for d in self.datasets]
+        id_dataset0 = [i for i, d in enumerate(valid_ds_names) if d == datasets[0]]
+        id_dataset1 = [i for i, d in enumerate(valid_ds_names) if d == datasets[1]]
+
+        out = self.spatial_query_multiple.differential_analysis_knn(
+            cell_type=ct,
+            fovs_id0=id_dataset0,
+            fovs_id1=id_dataset1,
+            k=k,
+            min_support=min_support
+        )
+        # Based on the format of out to see how to process later
+        n_fovs0 = len(list(out[0].values())[0])
+        n_fovs1 = len(list(out[1].values())[1])
+
+        # Assign support values of each pattern in each fov.
+        # Fov support is named using support_{dataset}_i.
+        # Since there might be some FOVs without cell type ct,
+        # hence 'i' is just used to index FOVs, instead of the real FOV ids of the pattern.
+        fp0 = pd.DataFrame(out[0]).T
+        fp0.columns = [f'support_{datasets[0]}_{i}' for i in range(n_fovs0)]
+        fp1 = pd.DataFrame(out[1]).T
+        fp1.columns = [f'support_{datasets[1]}_{i}' for i in range(n_fovs1)]
+        fp_datasets = pd.merge(fp0, fp1, left_index=True, right_index=True, how='outer')
+        fp_datasets.fillna(0, inplace=True)
+
+        match_ind_datasets = [
+            [col for ind, col in enumerate(fp_datasets.columns) if col.startswith(f"support_{dataset}")] for dataset in
+            datasets]
+        p_values = []
+        dataset_higher_ranks = []
+        for index, row in fp_datasets.iterrows():
+            group1 = pd.to_numeric(row[match_ind_datasets[0]].values)
+            group2 = pd.to_numeric(row[match_ind_datasets[1]].values)
+
+            # Perform the Mann-Whitney U test
+            stat, p = stats.mannwhitneyu(group1, group2, alternative='two-sided', method='auto')
+            p_values.append(p)
+
+            # Label the dataset with higher frequency of patterns based on rank median
+            support_rank = pd.concat([pd.DataFrame(group1), pd.DataFrame(group2)]).rank()  # ascending
+            median_rank1 = support_rank[:len(group1)].median()[0]
+            median_rank2 = support_rank[len(group1):].median()[0]
+            if median_rank1 > median_rank2:
+                dataset_higher_ranks.append(datasets[0])
+            else:
+                dataset_higher_ranks.append(datasets[1])
+
+        fp_datasets['dataset_higher_frequency'] = dataset_higher_ranks
+        # Apply Benjamini-Hochberg correction for multiple testing problems
+        if_rejected, corrected_p_values = mt.fdrcorrection(p_values,
+                                                           alpha=0.05,
+                                                           method='poscorr')
+
+        # Add the corrected p-values back to the DataFrame (optional)
+        fp_datasets['corrected p-values'] = corrected_p_values
+        fp_datasets['if_significant'] = if_rejected
+
+        # Return the significant patterns in each dataset
+        fp_dataset0 = fp_datasets[
+            (fp_datasets['dataset_higher_frequency'] == datasets[0]) & (fp_datasets['if_significant'])
+            ]['corrected p-values']
+        fp_dataset1 = fp_datasets[
+            (fp_datasets['dataset_higher_frequency'] == datasets[1]) & (fp_datasets['if_significant'])
+            ]['corrected p-values']
+        fp_dataset0 = fp_dataset0.sort_values(by='corrected p-values', ascending=True)
+        fp_dataset1 = fp_dataset1.sort_values(by='corrected p-values', ascending=True)
+        return fp_dataset0, fp_dataset1
+
     def differential_analysis_dist(self,
                                    ct: str,
                                    datasets: Optional[Union[str, List[str]]],
@@ -293,43 +381,68 @@ class spatial_query_multi:
 
         out = self.spatial_query_multiple.differential_analysis_dist(
             cell_type=ct,
-            datasets=datasets,
             fovs_id0=id_dataset0,
             fovs_id1=id_dataset1,
             radius=max_dist,
             min_support=min_support,
             min_size=min_size
         )
-        # Based on the format of out to see how to process later
-        print('Done!')
-        return out
+        n_fovs0 = len(list(out[0].values())[0])
+        n_fovs1 = len(list(out[1].values())[1])
 
-    def differential_analysis_knn(self,
-                                  ct: str,
-                                  datasets: Optional[Union[str, List[str]]],
-                                  k: int = 30,
-                                  min_support: float = 0.5,
-                                  ):
-        # Use same codes but use replace the frequent patterns search with cpp methods
-        datasets = self.check_dataset(datasets)
-        if len(datasets) != 2:
-            raise ValueError("Require 2 valid datasets for differential analysis.")
+        # Assign support values of each pattern in each fov.
+        # Fov support is named using support_{dataset}_i.
+        # Since there might be some FOVs without cell type ct,
+        # hence 'i' is just used to index FOVs, instead of the real FOV ids of the pattern.
+        fp0 = pd.DataFrame(out[0]).T
+        fp0.columns = [f'support_{datasets[0]}_{i}' for i in range(n_fovs0)]
+        fp1 = pd.DataFrame(out[1]).T
+        fp1.columns = [f'support_{datasets[1]}_{i}' for i in range(n_fovs1)]
+        fp_datasets = pd.merge(fp0, fp1, left_index=True, right_index=True, how='outer')
+        fp_datasets.fillna(0, inplace=True)
 
-        valid_ds_names = [d.split('_')[0] for d in self.datasets]
-        id_dataset0 = [i for i, d in enumerate(valid_ds_names) if d == datasets[0]]
-        id_dataset1 = [i for i, d in enumerate(valid_ds_names) if d == datasets[1]]
+        match_ind_datasets = [
+            [col for ind, col in enumerate(fp_datasets.columns) if col.startswith(f"support_{dataset}")] for dataset in
+            datasets]
+        p_values = []
+        dataset_higher_ranks = []
+        for index, row in fp_datasets.iterrows():
+            group1 = pd.to_numeric(row[match_ind_datasets[0]].values)
+            group2 = pd.to_numeric(row[match_ind_datasets[1]].values)
 
-        out = self.spatial_query_multiple.differential_analysis_knn(
-            cell_type=ct,
-            datasets=datasets,
-            fovs_id0=id_dataset0,
-            fovs_id1=id_dataset1,
-            k=k,
-            min_support=min_support
-        )
-        # Based on the format of out to see how to process later
-        print('Done!')
-        return out
+            # Perform the Mann-Whitney U test
+            stat, p = stats.mannwhitneyu(group1, group2, alternative='two-sided', method='auto')
+            p_values.append(p)
+
+            # Label the dataset with higher frequency of patterns based on rank median
+            support_rank = pd.concat([pd.DataFrame(group1), pd.DataFrame(group2)]).rank()  # ascending
+            median_rank1 = support_rank[:len(group1)].median()[0]
+            median_rank2 = support_rank[len(group1):].median()[0]
+            if median_rank1 > median_rank2:
+                dataset_higher_ranks.append(datasets[0])
+            else:
+                dataset_higher_ranks.append(datasets[1])
+
+        fp_datasets['dataset_higher_frequency'] = dataset_higher_ranks
+        # Apply Benjamini-Hochberg correction for multiple testing problems
+        if_rejected, corrected_p_values = mt.fdrcorrection(p_values,
+                                                           alpha=0.05,
+                                                           method='poscorr')
+
+        # Add the corrected p-values back to the DataFrame (optional)
+        fp_datasets['corrected p-values'] = corrected_p_values
+        fp_datasets['if_significant'] = if_rejected
+
+        # Return the significant patterns in each dataset
+        fp_dataset0 = fp_datasets[
+            (fp_datasets['dataset_higher_frequency'] == datasets[0]) & (fp_datasets['if_significant'])
+            ]['corrected p-values']
+        fp_dataset1 = fp_datasets[
+            (fp_datasets['dataset_higher_frequency'] == datasets[1]) & (fp_datasets['if_significant'])
+            ]['corrected p-values']
+        fp_dataset0 = fp_dataset0.sort_values(by='corrected p-values', ascending=True)
+        fp_dataset1 = fp_dataset1.sort_values(by='corrected p-values', ascending=True)
+        return fp_dataset0, fp_dataset1
 
     def check_dataset(self,
                       dataset: Optional[Union[str, List[str]]] = None,
