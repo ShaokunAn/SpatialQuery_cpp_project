@@ -86,8 +86,9 @@ class spatial_query_multiple:
             dis_duplicates=dis_duplicates,
         )
         if len(fp) == 0:
-            return pd.DataFrame(columns=['items', 'support'])
+            return pd.DataFrame(columns=['itemsets', 'support'])
         fp = pd.DataFrame(fp).sort_values(by='support', ascending=False, ignore_index=True)
+        fp.rename(columns={'items': 'itemsets'}, inplace=True)
         return fp
 
     def find_fp_dist(self,
@@ -119,9 +120,10 @@ class spatial_query_multiple:
             min_size=min_size
         )
         if len(fp) == 0:
-            return pd.DataFrame(columns=['items', 'support'])
+            return pd.DataFrame(columns=['itemsets', 'support'])
 
         fp = pd.DataFrame(fp).sort_values(by='support', ascending=False, ignore_index=True)
+        fp.rename(columns={'items': 'itemsets'}, inplace=True)
         return fp
 
     def motif_enrichment_knn(self,
@@ -155,12 +157,13 @@ class spatial_query_multiple:
                 min_support=min_support,
                 dis_duplicates=dis_duplicates,
             )
-            motifs = fp['items']
+            motifs = fp['itemsets'].tolist()
         else:
             # remove non-exist cell types in motifs
             if isinstance(motifs, str):
                 motifs = [motifs]
-            labels_valid = [self.labels[i] for i in id_dataset]
+            labels_valid = [list(set(self.labels[i])) for i in id_dataset]
+            labels_valid = [l for labels_id in labels_valid for l in labels_id]
             labels_valid_unique = set(labels_valid)
             motifs_exc = [m for m in motifs if m not in labels_valid_unique]
             if len(motifs_exc) != 0:
@@ -235,12 +238,13 @@ class spatial_query_multiple:
                 min_support=min_support,
                 dis_duplicates=dis_duplicates,
             )
-            motifs = fp['items']
+            motifs = fp['items'].tolist()
         else:
             # remove non-exist cell types in motifs
             if isinstance(motifs, str):
                 motifs = [motifs]
-            labels_valid = [self.labels[i] for i in id_dataset]
+            labels_valid = [list(set(self.labels[i])) for i in id_dataset]
+            labels_valid = [l for labels_id in labels_valid for l in labels_id]
             labels_valid_unique = set(labels_valid)
             motifs_exc = [m for m in motifs if m not in labels_valid_unique]
             if len(motifs_exc) != 0:
@@ -285,7 +289,7 @@ class spatial_query_multiple:
 
     def differential_analysis_knn(self,
                                   ct: str,
-                                  datasets: Optional[Union[str, List[str]]],
+                                  datasets: List[str],
                                   k: int = 30,
                                   min_support: float = 0.5,
                                   ):
@@ -307,7 +311,7 @@ class spatial_query_multiple:
         )
         # Based on the format of out to see how to process later
         n_fovs0 = len(list(out[0].values())[0])
-        n_fovs1 = len(list(out[1].values())[1])
+        n_fovs1 = len(list(out[1].values())[0])
 
         # Assign support values of each pattern in each fov.
         # Fov support is named using support_{dataset}_i.
@@ -319,6 +323,8 @@ class spatial_query_multiple:
         fp1.columns = [f'support_{datasets[1]}_{i}' for i in range(n_fovs1)]
         fp_datasets = pd.merge(fp0, fp1, left_index=True, right_index=True, how='outer')
         fp_datasets.fillna(0, inplace=True)
+        items_list = [s.split(", ") for s in fp_datasets.index]
+        fp_datasets['items'] = items_list
 
         match_ind_datasets = [
             [col for ind, col in enumerate(fp_datasets.columns) if col.startswith(f"support_{dataset}")] for dataset in
@@ -351,21 +357,22 @@ class spatial_query_multiple:
         # Add the corrected p-values back to the DataFrame (optional)
         fp_datasets['corrected p-values'] = corrected_p_values
         fp_datasets['if_significant'] = if_rejected
+        fp_datasets['p-values'] = p_values
 
         # Return the significant patterns in each dataset
         fp_dataset0 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[0]) & (fp_datasets['if_significant'])
-            ]['corrected p-values']
+            ][['items', 'p-values', 'corrected p-values']]
         fp_dataset1 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[1]) & (fp_datasets['if_significant'])
-            ]['corrected p-values']
+            ][['items', 'p-values', 'corrected p-values']]
         fp_dataset0 = fp_dataset0.sort_values(by='corrected p-values', ascending=True)
         fp_dataset1 = fp_dataset1.sort_values(by='corrected p-values', ascending=True)
         return fp_dataset0, fp_dataset1
 
     def differential_analysis_dist(self,
                                    ct: str,
-                                   datasets: Optional[Union[str, List[str]]],
+                                   datasets: List[str],
                                    max_dist: float = 100.0,
                                    min_support: float = 0.5,
                                    min_size: int = 0,
@@ -388,7 +395,7 @@ class spatial_query_multiple:
             min_size=min_size
         )
         n_fovs0 = len(list(out[0].values())[0])
-        n_fovs1 = len(list(out[1].values())[1])
+        n_fovs1 = len(list(out[1].values())[0])
 
         # Assign support values of each pattern in each fov.
         # Fov support is named using support_{dataset}_i.
@@ -400,6 +407,8 @@ class spatial_query_multiple:
         fp1.columns = [f'support_{datasets[1]}_{i}' for i in range(n_fovs1)]
         fp_datasets = pd.merge(fp0, fp1, left_index=True, right_index=True, how='outer')
         fp_datasets.fillna(0, inplace=True)
+        items_list = [s.split(", ") for s in fp_datasets.index]
+        fp_datasets['items'] = items_list
 
         match_ind_datasets = [
             [col for ind, col in enumerate(fp_datasets.columns) if col.startswith(f"support_{dataset}")] for dataset in
@@ -432,14 +441,15 @@ class spatial_query_multiple:
         # Add the corrected p-values back to the DataFrame (optional)
         fp_datasets['corrected p-values'] = corrected_p_values
         fp_datasets['if_significant'] = if_rejected
+        fp_datasets['p-values'] = p_values
 
         # Return the significant patterns in each dataset
         fp_dataset0 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[0]) & (fp_datasets['if_significant'])
-            ]['corrected p-values']
+            ][['items', 'p-values', 'corrected p-values']]
         fp_dataset1 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[1]) & (fp_datasets['if_significant'])
-            ]['corrected p-values']
+            ][['items', 'p-values', 'corrected p-values']]
         fp_dataset0 = fp_dataset0.sort_values(by='corrected p-values', ascending=True)
         fp_dataset1 = fp_dataset1.sort_values(by='corrected p-values', ascending=True)
         return fp_dataset0, fp_dataset1
