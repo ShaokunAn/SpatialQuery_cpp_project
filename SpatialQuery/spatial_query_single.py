@@ -165,7 +165,7 @@ class spatial_query_single:
                                                              min_support=min_support,
                                                              dis_duplicates=dis_duplicates,
                                                              max_dist=max_dist)
-        # Perform hypergeometric tests based on out values.
+        # Perform hyper-geometric tests based on out values.
         for motif_out_dict in out:
             motif = motif_out_dict['motifs']
             n_ct = motif_out_dict['n_center']

@@ -6,6 +6,7 @@ import statsmodels.stats.multitest as mt
 from anndata import AnnData
 from scipy.stats import hypergeom
 from spatial_module import SpatialDataMultiple
+import time
 
 
 class spatial_query_multiple:
@@ -150,6 +151,7 @@ class spatial_query_multiple:
         # Check whether specified motifs. If not, search frequent patterns among specified datasets
         # and use them as interested motifs
         if motifs is None:
+            start_time = time.time()
             fp = self.find_fp_knn(
                 ct=ct,
                 dataset=dataset,
@@ -158,8 +160,11 @@ class spatial_query_multiple:
                 dis_duplicates=dis_duplicates,
             )
             motifs = fp['itemsets'].tolist()
+            end_time = time.time()
+            print(f"{end_time-start_time} seconds for identifying frequent patterns")
         else:
             # remove non-exist cell types in motifs
+            start_time = time.time()
             if isinstance(motifs, str):
                 motifs = [motifs]
             labels_valid = [list(set(self.labels[i])) for i in id_dataset]
@@ -173,7 +178,10 @@ class spatial_query_multiple:
                 raise ValueError(f"All cell types in motifs are missed in {self.label_key}.")
             motifs = [
                 motifs]  # make sure motifs is a List[List[str]] to be consistent with the outputs of frequent patterns
+            end_time = time.time()
+            print(f"{end_time-start_time} seconds for pre-processing motifs")
 
+        start_time = time.time()
         out_enrichment = self.spatial_query_multiple.motif_enrichment_knn(
             cell_type=ct,
             motifs=motifs,
@@ -183,7 +191,10 @@ class spatial_query_multiple:
             dis_duplicates=dis_duplicates,
             max_dist=max_dist,
         )
+        end_time = time.time()
+        print(f"{end_time-start_time} seconds for cpp implementations")
 
+        start_time = time.time()
         out = []
         for motif_count in out_enrichment:
             motif = sorted(motif_count['motifs'])
@@ -196,7 +207,10 @@ class spatial_query_multiple:
             out.append(motif_out)
 
         out_pd = pd.DataFrame(out)
+        end_time = time.time()
+        print(f"{end_time - start_time} seconds for hypergeometric test")
 
+        start_time = time.time()
         p_values = out_pd['p-values'].tolist()
         if_rejected, corrected_p_values = mt.fdrcorrection(p_values,
                                                            alpha=0.05,
@@ -204,6 +218,8 @@ class spatial_query_multiple:
         out_pd['corrected p-values'] = corrected_p_values
         out_pd['if_significant'] = if_rejected
         out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
+        end_time = time.time()
+        print(f"{end_time-start_time} seconds for multi testing correction")
         return out_pd
 
     def motif_enrichment_dist(self,
@@ -324,7 +340,7 @@ class spatial_query_multiple:
         fp_datasets = pd.merge(fp0, fp1, left_index=True, right_index=True, how='outer')
         fp_datasets.fillna(0, inplace=True)
         items_list = [s.split(", ") for s in fp_datasets.index]
-        fp_datasets['items'] = items_list
+        fp_datasets['itemsets'] = items_list
 
         match_ind_datasets = [
             [col for ind, col in enumerate(fp_datasets.columns) if col.startswith(f"support_{dataset}")] for dataset in
@@ -362,10 +378,10 @@ class spatial_query_multiple:
         # Return the significant patterns in each dataset
         fp_dataset0 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[0]) & (fp_datasets['if_significant'])
-            ][['items', 'p-values', 'corrected p-values']]
+            ][['itemsets', 'p-values', 'corrected p-values']]
         fp_dataset1 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[1]) & (fp_datasets['if_significant'])
-            ][['items', 'p-values', 'corrected p-values']]
+            ][['itemsets', 'p-values', 'corrected p-values']]
         fp_dataset0 = fp_dataset0.sort_values(by='corrected p-values', ascending=True)
         fp_dataset1 = fp_dataset1.sort_values(by='corrected p-values', ascending=True)
         return fp_dataset0, fp_dataset1
@@ -408,7 +424,7 @@ class spatial_query_multiple:
         fp_datasets = pd.merge(fp0, fp1, left_index=True, right_index=True, how='outer')
         fp_datasets.fillna(0, inplace=True)
         items_list = [s.split(", ") for s in fp_datasets.index]
-        fp_datasets['items'] = items_list
+        fp_datasets['itemsets'] = items_list
 
         match_ind_datasets = [
             [col for ind, col in enumerate(fp_datasets.columns) if col.startswith(f"support_{dataset}")] for dataset in
@@ -446,10 +462,10 @@ class spatial_query_multiple:
         # Return the significant patterns in each dataset
         fp_dataset0 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[0]) & (fp_datasets['if_significant'])
-            ][['items', 'p-values', 'corrected p-values']]
+            ][['itemsets', 'p-values', 'corrected p-values']]
         fp_dataset1 = fp_datasets[
             (fp_datasets['dataset_higher_frequency'] == datasets[1]) & (fp_datasets['if_significant'])
-            ][['items', 'p-values', 'corrected p-values']]
+            ][['itemsets', 'p-values', 'corrected p-values']]
         fp_dataset0 = fp_dataset0.sort_values(by='corrected p-values', ascending=True)
         fp_dataset1 = fp_dataset1.sort_values(by='corrected p-values', ascending=True)
         return fp_dataset0, fp_dataset1
@@ -477,4 +493,4 @@ class spatial_query_multiple:
             if len(out) == 0:
                 raise ValueError("All input dataset names are invalid.")
 
-        return out
+        return list(set(out))
