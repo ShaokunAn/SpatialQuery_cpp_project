@@ -257,6 +257,7 @@ class spatial_query_multiple:
             motifs = fp['items'].tolist()
         else:
             # remove non-exist cell types in motifs
+            start_time = time.time()
             if isinstance(motifs, str):
                 motifs = [motifs]
             labels_valid = [list(set(self.labels[i])) for i in id_dataset]
@@ -270,7 +271,10 @@ class spatial_query_multiple:
                 raise ValueError(f"All cell types in motifs are missed in {self.label_key}.")
             motifs = [
                 motifs]  # make sure motifs is a List[List[str]] to be consistent with the outputs of frequent patterns
+            end_time = time.time()
+            print(f"{end_time-start_time} seconds for pre-processing motifs")
 
+        start_time = time.time()
         out_enrichment = self.spatial_query_multiple.motif_enrichment_dist(
             cell_type=ct,
             motifs=motifs,
@@ -280,7 +284,10 @@ class spatial_query_multiple:
             dis_duplicates=dis_duplicates,
             min_size=min_size,
         )
+        end_time = time.time()
+        print(f"{end_time-start_time} seconds for cpp_implementations")
 
+        start_time = time.time()
         out = []
         for motif_count in out_enrichment:
             motif = sorted(motif_count['motifs'])
@@ -293,7 +300,10 @@ class spatial_query_multiple:
             out.append(motif_out)
 
         out_pd = pd.DataFrame(out)
+        end_time = time.time()
+        print(f"{end_time - start_time} seconds for hypergeometric test")
 
+        start_time = time.time()
         p_values = out_pd['p-values'].tolist()
         if_rejected, corrected_p_values = mt.fdrcorrection(p_values,
                                                            alpha=0.05,
@@ -301,6 +311,8 @@ class spatial_query_multiple:
         out_pd['corrected p-values'] = corrected_p_values
         out_pd['if_significant'] = if_rejected
         out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
+        end_time = time.time()
+        print(f"{end_time - start_time} seconds for multi testing correction")
         return out_pd
 
     def differential_analysis_knn(self,
