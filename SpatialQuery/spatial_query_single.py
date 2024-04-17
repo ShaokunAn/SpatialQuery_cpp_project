@@ -1,14 +1,18 @@
+import warnings
 from collections import Counter
-from typing import Union, List
+from typing import Union
 
 import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scfind
 import seaborn as sns
 import statsmodels.stats.multitest as mt
 from scipy.stats import hypergeom
 from spatial_module import SpatialDataSingle
+
+from .utils import *
 
 
 class spatial_query_single:
@@ -17,6 +21,8 @@ class spatial_query_single:
                  dataset: str = 'ST',
                  spatial_key: str = 'X_spatial',
                  label_key: str = 'cell_type',
+                 feature_name: str = 'feature_name',
+                 qb: int = 2,
                  ):
         if spatial_key not in adata.obsm.keys() or label_key not in adata.obs.keys():
             raise ValueError(f"The Anndata object must contain {spatial_key} in obsm and {label_key} in obs.")
@@ -31,6 +37,16 @@ class spatial_query_single:
         self.spatial_query_single = SpatialDataSingle()
         self.spatial_query_single.set_data(adata.obsm[self.spatial_key], self.labels)  # store data in cpp codes
         self.spatial_query_single.build_kdtree()
+
+        # build scfind index of expression data for each FOV
+        self.scfind_index = scfind.SCFind()
+        self.scfind_index.buildCellTypeIndex(
+            adata=adata,
+            dataset_name=self.dataset,
+            feature_name=feature_name,
+            cell_type_label=self.label_key,
+            qb=qb,
+        )
 
     @staticmethod
     def has_motif(neighbors: List[str], labels: List[str]) -> bool:
@@ -395,6 +411,76 @@ class spatial_query_single:
 
         return fp.sort_values(by='support', ignore_index=True, ascending=False)
 
+    def niche_analysis_knn(self,
+                           ct: str,
+                           motifs: Union[List[str], str],
+                           k: int = 30,
+                           min_support: float = 0.5,
+                           ):
+        # Check if center cell type ct and cells in motifs exist in cell labels
+        ct = ct.replace("_", "-")
+        if ct not in set(self.labels):
+            raise ValueError(f"Found no {ct} in {self.label_key}!")
+        if isinstance(motifs, str):
+            motifs = [motifs]
+        labels_unique = set(self.labels)
+        motif_exc = [m for m in motifs if m.replace("_", "-") not in labels_unique]
+        if len(motif_exc) != 0:
+            print(f"Found no {motif_exc} in {self.label_key}. Ignoring them.")
+        motifs = [m.replace("_", "-") for m in motifs if m not in motif_exc]
+        if len(motifs) == 0:
+            raise ValueError("All cell types have been removed from the provided list. \n"
+                             "Please double-check the input names of neighboring cell types.")
+
+        # Test if given motif list is significant enriched in the neighborhood of center cell type
+        enriched_res = self.motif_enrichment_knn(
+            ct=ct,
+            motifs=motifs,
+        )
+        if enriched_res['corrected p-values'] < 0.05:
+            pass
+        else:
+            warnings.warn("The input list of cell types is not enriched in the neighborhood of central cell type.\n"
+                          "Attempting to identify the subset of cell types "
+                          "that frequently occur in the neighborhood... ")
+            fps = self.find_fp_knn(ct=ct,
+                                   k=k,
+                                   min_support=min_support,
+                                   dis_duplicates=False)
+            fps = fps['itemsets']
+            fps = [m for m in fps]  # test if this is necessary?
+            if len(fps) == 0:
+                raise ValueError(
+                    "No frequent patterns were found. "
+                    "Please lower min_support or adjust k (the number of nearest neighbors) and try again.")
+
+            # Identify the intersections of cell types in motif and in each frequent patterns
+            intersections = []
+            for fp_list in fps:
+                intersection = list(set(fp_list) & set(motifs))
+                intersections.append(intersection)
+            if len(intersections) == 0:
+                raise ValueError(
+                    f"No cell types in input is frequent in the neighborhood."
+                    f"Please lower min_support or adjust k (the number of nearest neighbors) and try again."
+                )
+
+            # Find the maximal patterns in intersections
+            maximal_intersections = find_maximal_patterns(intersections)
+
+            if len(maximal_intersections) > 1:
+                print(f"Found multiple frequent subsets. Please select one of them:")
+                [print(f"{fp}") for fp in maximal_intersections]
+                return
+            else:
+                if set(maximal_intersections[0]) == set(motifs):
+                    print(f"Input cell type list frequently occurs in the neighborhood of central cell type. "
+                          f"Still use this input list.")
+                else:
+                    print(
+                        f"Found the frequent subset of cell types: {maximal_intersections[0]}")
+
+
     def plot_fov(self,
                  min_cells_label: int = 50,
                  title: str = 'Spatial distribution of cell types',
@@ -457,10 +543,10 @@ class spatial_query_single:
 
         spatial_pos = self.spatial_query_single.get_coordinates()
         labels_unique = set(self.labels)
-        motif_exc = [m for m in motif if m not in labels_unique]
+        motif_exc = [m for m in motif if m.replace("_", "-") not in labels_unique]
         if len(motif_exc) != 0:
             print(f"Found no {motif_exc} in {self.label_key}. Ignoring them.")
-        motif = [m for m in motif if m not in motif_exc]
+        motif = [m.replace("_", "-") for m in motif if m not in motif_exc]
 
         # Build mesh
         xmax, ymax = np.max(spatial_pos, axis=0)
@@ -548,10 +634,10 @@ class spatial_query_single:
 
         spatial_pos = self.spatial_query_single.get_coordinates()
         labels_unique = set(self.labels)
-        motif_exc = [m for m in motif if m not in labels_unique]
+        motif_exc = [m for m in motif if m.replace("_", "-") not in labels_unique]
         if len(motif_exc) != 0:
             print(f"Found no {motif_exc} in {self.label_key}. Ignoring them.")
-        motif = [m for m in motif if m not in motif_exc]
+        motif = [m.replace("_", "-") for m in motif if m not in motif_exc]
 
         # Random sample points
         xmax, ymax = np.max(spatial_pos, axis=0)
@@ -625,10 +711,10 @@ class spatial_query_single:
         if isinstance(motif, str):
             motif = [motif]
 
-        motif_exc = [m for m in motif if m not in set(self.labels)]
+        motif_exc = [m for m in motif if m.replace("_", "-") not in set(self.labels)]
         if len(motif_exc) != 0:
             print(f"Found no {motif_exc} in {self.label_key}. Ignoring them.")
-        motif = [m for m in motif if m not in motif_exc]
+        motif = [m.replace("_", "-") for m in motif if m not in motif_exc]
 
         if ct not in set(self.labels):
             raise ValueError(f"Found no {ct} in {self.label_key}!")
