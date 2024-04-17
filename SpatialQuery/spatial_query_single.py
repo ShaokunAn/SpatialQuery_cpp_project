@@ -480,7 +480,6 @@ class spatial_query_single:
                     print(
                         f"Found the frequent subset of cell types: {maximal_intersections[0]}")
 
-
     def plot_fov(self,
                  min_cells_label: int = 50,
                  title: str = 'Spatial distribution of cell types',
