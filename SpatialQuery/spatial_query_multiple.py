@@ -129,7 +129,7 @@ class spatial_query_multiple:
 
     def motif_enrichment_knn(self,
                              ct: str,
-                             motifs: Optional = None,
+                             motifs: Optional[Union[str, List[str]]] = None,
                              dataset: Optional[Union[str, List[str]]] = None,
                              k: int = 30,
                              min_support: float = 0.5,
@@ -224,7 +224,7 @@ class spatial_query_multiple:
 
     def motif_enrichment_dist(self,
                               ct: str,
-                              motifs: Optional = None,
+                              motifs: Optional[Union[str, List[str]]] = None,
                               dataset: Optional[Union[str, List[str]]] = None,
                               max_dist: float = 100.0,
                               min_size: int = 0,

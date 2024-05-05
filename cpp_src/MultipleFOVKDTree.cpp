@@ -84,22 +84,22 @@ py::list SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::lis
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for KNN searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
-    std::cout<<"Number of transactions: "<<transactions.size()<<std::endl;
+    // std::cout << "Running time for KNN searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
+    // std::cout<<"Number of transactions: "<<transactions.size()<<std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     FPTree fpTree(transactions, static_cast<uint64_t>(std::ceil(minSupport * transactions.size())));
     std::set<Pattern> frequentPatterns = fptree_growth(fpTree);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for frequent patterns searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
-    std::cout << "Number of frequeng patterns: " << frequentPatterns.size() << std::endl;
+    // std::cout << "Running time for frequent patterns searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
+    // std::cout << "Number of frequeng patterns: " << frequentPatterns.size() << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     frequentPatterns = findMaximalPatterns(frequentPatterns);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for find maximal patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
+    // std::cout << "Running time for find maximal patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
 
     std::set<DuplicatePattern> frequentDuplicatePatterns;
     if (disDuplicates)
@@ -108,7 +108,7 @@ py::list SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::lis
         frequentDuplicatePatterns = removeSuffix(frequentPatterns);
         end = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for remove suffix of patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
+        // std::cout << "Running time for remove suffix of patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
     }
     else
     {
@@ -122,7 +122,7 @@ py::list SpatialDataMultiple::buildFPTreeKNN(const Item &cellType, const py::lis
 
         end = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for trivial work: " << duration.count()/1000000.0 << " seconds" << std::endl;
+        // std::cout << "Running time for trivial work: " << duration.count()/1000000.0 << " seconds" << std::endl;
     }
 
     py::list result;
@@ -216,23 +216,23 @@ py::list SpatialDataMultiple::buildFPTreeDist(const Item &cellType, const py::li
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for radius-based neighbors searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
-    std::cout<<"Number of transactions: "<<transactions.size()<<std::endl;
-    std::cout<<"Average number of neighbors: "<<n_neighbors/float(transactions.size())<<std::endl;
+    // std::cout << "Running time for radius-based neighbors searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
+    // std::cout<<"Number of transactions: "<<transactions.size()<<std::endl;
+    // std::cout<<"Average number of neighbors: "<<n_neighbors/float(transactions.size())<<std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     FPTree fpTree(transactions, static_cast<uint64_t>(std::ceil(minSupport * transactions.size())));
     std::set<Pattern> frequentPatterns = fptree_growth(fpTree);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for frequent patterns searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
-    std::cout<< "Number of frequeng patterns: "<<frequentPatterns.size()<< std::endl;
+    // std::cout << "Running time for frequent patterns searching: " << duration.count()/1000000.0 << " seconds" << std::endl;
+    // std::cout<< "Number of frequeng patterns: "<<frequentPatterns.size()<< std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     frequentPatterns = findMaximalPatterns(frequentPatterns);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Running time for find maximal patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
+    // std::cout << "Running time for find maximal patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
 
     std::set<DuplicatePattern> frequentDuplicatePatterns;
     if (disDuplicates)
@@ -241,7 +241,7 @@ py::list SpatialDataMultiple::buildFPTreeDist(const Item &cellType, const py::li
         frequentDuplicatePatterns = removeSuffix(frequentPatterns);
         end = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for remove suffix of patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
+        // std::cout << "Running time for remove suffix of patterns: " << duration.count()/1000000.0 << " seconds" << std::endl;
     }
     else
     {
@@ -254,7 +254,7 @@ py::list SpatialDataMultiple::buildFPTreeDist(const Item &cellType, const py::li
         }
         end = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        std::cout << "Running time for trivial work: " << duration.count()/1000000 << " seconds" << std::endl;
+        // std::cout << "Running time for trivial work: " << duration.count()/1000000 << " seconds" << std::endl;
     }
 
     py::list result;
