@@ -6,7 +6,7 @@ import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import scfind
+# import scfind
 import seaborn as sns
 import statsmodels.stats.multitest as mt
 from scipy.stats import hypergeom
@@ -39,14 +39,14 @@ class spatial_query_single:
         self.spatial_query_single.build_kdtree()
 
         # build scfind index of expression data for each FOV
-        self.scfind_index = scfind.SCFind()
-        self.scfind_index.buildCellTypeIndex(
-            adata=adata,
-            dataset_name=self.dataset,
-            feature_name=feature_name,
-            cell_type_label=self.label_key,
-            qb=qb,
-        )
+        # self.scfind_index = scfind.SCFind()
+        # self.scfind_index.buildCellTypeIndex(
+        #     adata=adata,
+        #     dataset_name=self.dataset,
+        #     feature_name=feature_name,
+        #     cell_type_label=self.label_key,
+        #     qb=qb,
+        # )
 
     @staticmethod
     def has_motif(neighbors: List[str], labels: List[str]) -> bool:
@@ -411,80 +411,125 @@ class spatial_query_single:
 
         return fp.sort_values(by='support', ignore_index=True, ascending=False)
 
-    def niche_analysis_knn(self,
-                           ct: str,
-                           motifs: Union[List[str], str],
-                           k: int = 30,
-                           min_support: float = 0.5,
-                           ):
-        # Check if center cell type ct and cells in motifs exist in cell labels
-        ct = ct.replace("_", "-")
-        if ct not in set(self.labels):
-            raise ValueError(f"Found no {ct} in {self.label_key}!")
-        if isinstance(motifs, str):
-            motifs = [motifs]
-        labels_unique = set(self.labels)
-        motif_exc = [m for m in motifs if m.replace("_", "-") not in labels_unique]
-        if len(motif_exc) != 0:
-            print(f"Found no {motif_exc} in {self.label_key}. Ignoring them.")
-        motifs = [m.replace("_", "-") for m in motifs if m not in motif_exc]
-        if len(motifs) == 0:
-            raise ValueError("All cell types have been removed from the provided list. \n"
-                             "Please double-check the input names of neighboring cell types.")
+    def get_frequent_subsets_knn(
+            self,
+            ct: str,
+            motifs: List[str],
+            k: int = 30,
+            min_support: float = 0.5,
+            dis_duplicates: bool = False
+    ):
+        """
+        Identify the subset of motifs that frequently occurrs in the neighborhood of central cell type "ct"
+        :param ct: Name of central cell type
+        :param motifs: Cell types of interest in the neighborhood of ct
+        :param k: Number of nearest neighbors
+        :param min_support: Minimum support value for identifying frequent patterns
+        :param dis_duplicates: Boolean value indicating whether considering the duplicates of cell types in neighborhoods
+        :return:
+        """
+        fps = self.find_fp_knn(ct=ct,
+                               k=k,
+                               min_support=min_support,
+                               dis_duplicates=dis_duplicates)
+        fps = fps['itemsets']
+        fps = [m for m in fps]  # test if this is necessary?
+        if len(fps) == 0:
+            raise ValueError(
+                "No frequent patterns were found. "
+                "Please lower min_support or adjust k (the number of nearest neighbors) and try again.")
 
-        # Test if given motif list is significant enriched in the neighborhood of center cell type
-        enriched_res = self.motif_enrichment_knn(
-            ct=ct,
-            motifs=motifs,
-        )
-        if enriched_res['corrected p-values'] < 0.05:
-            pass
+        # Identify the intersections of cell types in motif and in each frequent patterns
+        intersections = []
+        for fp_list in fps:
+            intersection = list(set(fp_list) & set(motifs))
+            intersections.append(intersection)
+        if len(intersections) == 0:
+            raise ValueError(
+                f"No cell types in input is frequent in the neighborhood."
+                f"Please lower min_support or adjust k (the number of nearest neighbors) and try again."
+            )
+
+        # Find the maximal patterns in intersections
+        maximal_intersections = find_maximal_patterns(intersections)
+
+        if len(maximal_intersections) > 1:
+            print(f"Found multiple frequent subsets. Please select one of them:")
+            [print(f"{fp}") for fp in maximal_intersections]
+            motifs_ = maximal_intersections
+        elif set(maximal_intersections[0]) == set(motifs):
+            print(f"The input cell type list frequently occurs in the neighborhood of the central cell type.\n"
+                  f"Continue using this input list.")
+            motifs_ = motifs
         else:
-            warnings.warn("The input list of cell types is not enriched in the neighborhood of central cell type.\n"
-                          "Attempting to identify the subset of cell types "
-                          "that frequently occur in the neighborhood... ")
-            fps = self.find_fp_knn(ct=ct,
-                                   k=k,
-                                   min_support=min_support,
-                                   dis_duplicates=False)
-            fps = fps['itemsets']
-            fps = [m for m in fps]  # test if this is necessary?
-            if len(fps) == 0:
-                raise ValueError(
-                    "No frequent patterns were found. "
-                    "Please lower min_support or adjust k (the number of nearest neighbors) and try again.")
+            print(
+                f"Found the frequent subset of cell types: {maximal_intersections[0]}"
+            )
+            motifs_ = maximal_intersections[0]
 
-            # Identify the intersections of cell types in motif and in each frequent patterns
-            intersections = []
-            for fp_list in fps:
-                intersection = list(set(fp_list) & set(motifs))
-                intersections.append(intersection)
-            if len(intersections) == 0:
-                raise ValueError(
-                    f"No cell types in input is frequent in the neighborhood."
-                    f"Please lower min_support or adjust k (the number of nearest neighbors) and try again."
-                )
+        return motifs_
 
-            # Find the maximal patterns in intersections
-            maximal_intersections = find_maximal_patterns(intersections)
+    # def niche_analysis_knn(self,
+    #                        ct: str,
+    #                        motifs: Union[List[str], str],
+    #                        k: int = 30,
+    #                        min_support: float = 0.5,
+    #                        check_significance: bool = False
+    #                        ):
+    #     """
+    #     Identify cell-cell communications between the central cell type 'ct' and neighboring cell types in motifs.
+    #     First, check if motifs are significantly or frequently enriched in the neighborhood of the central cell type.
+    #     If not, identify the enriched subsets of motifs and prompt the user to select one for niche analysis.
 
-            if len(maximal_intersections) > 1:
-                print(f"Found multiple frequent subsets. Please select one of them:")
-                [print(f"{fp}") for fp in maximal_intersections]
-                return
-            else:
-                if set(maximal_intersections[0]) == set(motifs):
-                    print(f"Input cell type list frequently occurs in the neighborhood of central cell type. "
-                          f"Still use this input list.")
-                else:
-                    print(
-                        f"Found the frequent subset of cell types: {maximal_intersections[0]}")
+    #     :param ct: Name of central cell type
+    #     :param motifs: Cell types of interest
+    #     :param k: Number of nearest neighbors
+    #     :param min_support: Minimum support value for identifying the frequent patterns
+    #     :param check_significance: Boolean value to determine if the significance of input motifs needs to be examined
+    #     :return: A list of candidate patterns or niche analysis results
+    #     """
+    #     # Check if center cell type ct and cells in motifs exist in cell labels
+    #     ct = ct.replace("_", "-")
+    #     if ct not in set(self.labels):
+    #         raise ValueError(f"Found no {ct} in {self.label_key}!")
+    #     if isinstance(motifs, str):
+    #         motifs = [motifs]
+    #     labels_unique = set(self.labels)
+    #     motif_exc = [m for m in motifs if m.replace("_", "-") not in labels_unique]
+    #     if len(motif_exc) != 0:
+    #         print(f"Found no {motif_exc} in {self.label_key}. Ignoring them.")
+    #     motifs = [m.replace("_", "-") for m in motifs if m not in motif_exc]
+    #     if len(motifs) == 0:
+    #         raise ValueError("All cell types have been removed from the provided list. \n"
+    #                          "Please double-check the input names of neighboring cell types.")
+
+    #     # Test if given motif list is significant enriched in the neighborhood of center cell type
+    #     if check_significance:
+    #         enriched_res = self.motif_enrichment_knn(
+    #             ct=ct,
+    #             motifs=motifs,
+    #         )
+    #         if enriched_res['corrected p-values'] < 0.05:
+    #             motifs_ = motifs
+    #         else:
+    #             warnings.warn("The input list of cell types is not enriched in the neighborhood of central cell type.\n"
+    #                           "Attempting to identify the subset of cell types "
+    #                           "that frequently occur in the neighborhood... ")
+    #             motifs_ = self.get_frequent_subsets_knn(ct, motifs, k, min_support, False)
+    #             if len(motifs_) > 1:  # indicates find multiple subsets, ask user to select one
+    #                 return motifs_
+    #     else:
+    #         motifs_ = motifs
+
+
+        # Perform cell-cell communication for motifs_
+        # Firstly, use marker genes of cell types in motifs_ as candidates of ligand-receptor pair
+
 
     def plot_fov(self,
                  min_cells_label: int = 50,
                  title: str = 'Spatial distribution of cell types',
                  fig_size: tuple = (10, 5)):
-
         spatial_pos = self.spatial_query_single.get_coordinates()
         cell_type_counts = Counter(self.labels)
         n_colors = sum(count >= min_cells_label for count in cell_type_counts.values())
@@ -536,7 +581,6 @@ class spatial_query_single:
                         fig_size: tuple = (10, 5),
                         max_dist: float = 100,
                         ):
-
         if isinstance(motif, str):
             motif = [motif]
 
