@@ -161,7 +161,7 @@ class spatial_query_multiple:
             )
             motifs = fp['itemsets'].tolist()
             end_time = time.time()
-            print(f"{end_time-start_time} seconds for identifying frequent patterns")
+            # print(f"{end_time-start_time} seconds for identifying frequent patterns")
         else:
             # remove non-exist cell types in motifs
             start_time = time.time()
@@ -179,7 +179,7 @@ class spatial_query_multiple:
             motifs = [
                 motifs]  # make sure motifs is a List[List[str]] to be consistent with the outputs of frequent patterns
             end_time = time.time()
-            print(f"{end_time-start_time} seconds for pre-processing motifs")
+            # print(f"{end_time-start_time} seconds for pre-processing motifs")
 
         start_time = time.time()
         out_enrichment = self.spatial_query_multiple.motif_enrichment_knn(
@@ -192,7 +192,7 @@ class spatial_query_multiple:
             max_dist=max_dist,
         )
         end_time = time.time()
-        print(f"{end_time-start_time} seconds for cpp implementations")
+        # print(f"{end_time-start_time} seconds for cpp implementations")
 
         start_time = time.time()
         out = []
@@ -208,7 +208,7 @@ class spatial_query_multiple:
 
         out_pd = pd.DataFrame(out)
         end_time = time.time()
-        print(f"{end_time - start_time} seconds for hypergeometric test")
+        # print(f"{end_time - start_time} seconds for hypergeometric test")
 
         start_time = time.time()
         p_values = out_pd['p-values'].tolist()
@@ -219,7 +219,7 @@ class spatial_query_multiple:
         out_pd['if_significant'] = if_rejected
         out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
         end_time = time.time()
-        print(f"{end_time-start_time} seconds for multi testing correction")
+        # print(f"{end_time-start_time} seconds for multi testing correction")
         return out_pd
 
     def motif_enrichment_dist(self,
@@ -272,7 +272,7 @@ class spatial_query_multiple:
             motifs = [
                 motifs]  # make sure motifs is a List[List[str]] to be consistent with the outputs of frequent patterns
             end_time = time.time()
-            print(f"{end_time-start_time} seconds for pre-processing motifs")
+            # print(f"{end_time-start_time} seconds for pre-processing motifs")
 
         start_time = time.time()
         out_enrichment = self.spatial_query_multiple.motif_enrichment_dist(
@@ -285,7 +285,7 @@ class spatial_query_multiple:
             min_size=min_size,
         )
         end_time = time.time()
-        print(f"{end_time-start_time} seconds for cpp_implementations")
+        # print(f"{end_time-start_time} seconds for cpp_implementations")
 
         start_time = time.time()
         out = []
@@ -301,7 +301,7 @@ class spatial_query_multiple:
 
         out_pd = pd.DataFrame(out)
         end_time = time.time()
-        print(f"{end_time - start_time} seconds for hypergeometric test")
+        # print(f"{end_time - start_time} seconds for hypergeometric test")
 
         start_time = time.time()
         p_values = out_pd['p-values'].tolist()
@@ -312,7 +312,7 @@ class spatial_query_multiple:
         out_pd['if_significant'] = if_rejected
         out_pd = out_pd.sort_values(by='corrected p-values', ignore_index=True)
         end_time = time.time()
-        print(f"{end_time - start_time} seconds for multi testing correction")
+        # print(f"{end_time - start_time} seconds for multi testing correction")
         return out_pd
 
     def differential_analysis_knn(self,
