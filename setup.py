@@ -27,9 +27,7 @@ setup(
     packages=find_packages(),
     author='Shaokun An',
     author_email='shan12@bwh.harvard.edu',
-    description='scfind is a method for searching specific cell types from large single-cell datasets by a query of '
-                'gene list. scfind can suggest subqueries score by TF-IDF method. scfind can perform hypergeometric '
-                'test which allows the evaluation of marker genes specific to each cell type within a dataset.',
+    description='',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     classifiers=[

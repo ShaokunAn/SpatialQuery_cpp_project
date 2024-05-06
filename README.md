@@ -7,3 +7,5 @@ pcl, boost, eigen, flann
 brew install pcl
 
 brew list pcl
+
+# set dependency library path in setup.py (include_dirs, library_dirs)
