@@ -1,22 +1,25 @@
-## Installation
-It may take some time to install cpp libraries.
+SpatialQuery is a package for fast query of Spatial Transcriptomics data. 
 
-cpp libraries needed:
-pcl, boost, eigen, flann
-### Option 1: use brew to install libraries
-`brew install pcl`
+### Analysis of ST data in SpatialQuery
 
-`brew list pcl`
+With annotated ST data as input, SpatialQuery first builds a k-D tree based on spatial location in each FOV for fast query of neighboring cell compositions. It is composed of methods for single-FOV and multiple-FOVs.
+In single-FOV, it contains methods:
 
-`# set dependency library path in setup.py (include_dirs, library_dirs)`
+- identify frequent patterns across FOV ()
+- identify frequent patterns around cell type of interest
+- identify statistically significant patterns around cell type of interest
 
-`cd to directory with setup.py` 
+For multiple-FOVs data, it contains methods:
 
-`pip install .`
+- identify frequent patterns around cell type of interest in specified dataset
+- identify statistically significant patterns around cell type of interest in specified dataset
+- identify differential patterns across datasets
 
+### Installation
 
-
-### 
+```
+pip install SpatialQuery
+```
 
 
 
